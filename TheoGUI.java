@@ -1,9 +1,10 @@
 import javax.swing.*;
-import java.util.*;
+import javax.swing.event.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.*;
 
-public class TheoGUI{
+public class TheoGUI implements ChangeListener {
     private JFrame frame;
     private BorderLayout borderLayout;
     private JPanel topPanel;
@@ -11,15 +12,17 @@ public class TheoGUI{
     private JPanel panel;
     private Board board;
     private JButton[][] buttons;
-    private JButton pauseButton; 
-    private JButton saveButton;
-    private JButton stepButton;
-    private JButton speedUpButton;
-    private JButton slowDownButton;
+    protected PauseButton pauseButton;
+    protected SaveButton saveButton;
+    protected JButton stepButton;
+    protected JButton randomButton;
+    protected JSlider slider;
     private JButton resetButton;
     private boolean pauseState = false;
+    protected JTextField input;
     private Game game;
-    public TheoGUI(int width, int height, Board board, Game game){
+
+    public TheoGUI(int width, int height, Board board, Game game) {
         this.game = game;
         this.board = board;
         panel = new JPanel();
@@ -34,96 +37,180 @@ public class TheoGUI{
         layout = new GridLayout(width, height);
         panel.setLayout(layout);
         frame.add(panel);
-        for (int i = 0; i < width; i++){
-            for (int j = 0; j < height; j++){
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
                 final int x = i;
                 final int y = j;
                 buttons[i][j] = new JButton();
                 buttons[i][j].setBackground(Color.BLACK);
-                buttons[i][j].addActionListener(new ActionListener(){
-                    public void actionPerformed(ActionEvent e){
+                buttons[i][j].addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
                         swapBoxColour(x, y);
                         board.swapIndex(x, y);
+                        board.swapSet(y, x);
                     }
                 });
                 panel.add(buttons[i][j]);
             }
         }
         topPanel = new JPanel();
+        pauseButton = new PauseButton("Play", this.game, this);
+        pauseButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
 
-        pauseButton = new JButton("Play");
-
-        pauseButton.addActionListener(new ActionListener(){
-            public void actionPerformed(ActionEvent e){
-                swapPauseState();
+                if (!game.getPauseState()) {
+                    pauseButton.setText("Play");
+                    saveButton.setVisible(true);
+                    stepButton.setVisible(true);
+                } else {
+                    Thread pauseThread = new Thread(pauseButton);
+                    pauseButton.setText("Pause");
+                    saveButton.setVisible(false);
+                    stepButton.setVisible(false);
+                    pauseThread.start();
+                }
+                game.swapPaused();
             }
         });
-        
-        
-        saveButton = new JButton("Save");
-        //saveButton.addActionListener(this); 
-     
+        randomButton = new JButton("Randomise");
+        randomButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                random();
+            }
+        });
+        saveButton = new SaveButton("Save", this.game, this);
+        saveButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    Thread saveThread = new Thread(saveButton);
+                    saveThread.start();
+                } catch (Exception ere) {
+
+                }
+            }
+        });
+
         stepButton = new JButton("Step");
-        stepButton.addActionListener(new ActionListener(){
-            public void actionPerformed(ActionEvent e){
-                step();
+        stepButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    step();
+                } catch (Exception l) {
+
+                }
+
             }
         });
         resetButton = new JButton("Reset");
-        resetButton.addActionListener(new ActionListener(){
-            public void actionPerformed(ActionEvent e){
+        resetButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
                 reset();
             }
         });
-        speedUpButton = new JButton("Speed up");
-        //speedUpButton.addActionListener(this); 
-
-        slowDownButton = new JButton("Slow down");
-        //slowDownButton.addActionListener(this);
-
+        slider = new JSlider(3, 1000, 23);
+        slider.addChangeListener(this);
+        input = new JTextField("Enter save name",20);
+        topPanel.add(slider);
         topPanel.add(pauseButton);
         topPanel.add(saveButton);
         topPanel.add(stepButton);
         topPanel.add(resetButton);
-    
+        topPanel.add(randomButton);
+        topPanel.add(input);
+
         frame.add(BorderLayout.NORTH, topPanel);
-        //frame.add(panel);
+        // frame.add(panel);
         panel.setVisible(true);
         frame.setVisible(true);
     }
-    public void swapPauseState(){
-        if (this.pauseState){
-            this.pauseButton.setText("Play");
-            this.saveButton.setVisible(true);
-        } else {
-            this.pauseButton.setText("Pause");
-            this.saveButton.setVisible(false);
-        }
-        if (this.pauseState){
-            this.pauseState = false;
-        } else {
-            this.pauseState = true;
-        }
-        this.game.swapPaused();
-        
+
+    public void stateChanged(ChangeEvent e) {
+        this.game.setDelay(this.slider.getValue());
     }
-    public void step(){
+
+    public void step() throws Exception {
         this.game.requestStep();
     }
-    public void reset(){
+
+    public void reset() {
         this.game.reset();
     }
-    public void swapBoxColour(int y, int x){
-        System.out.println("changed" + x + " " + y);
-        boolean on = this.board.getIndex(y, x);
-        if (on){
+
+    public void swapBoxColour(int y, int x) {
+        boolean on = (this.board.getIndex(y, x));
+        if (on) {
             this.buttons[y][x].setBackground(Color.BLACK);
         } else {
             this.buttons[y][x].setBackground(Color.WHITE);
         }
     }
-    public void setBoxBlack(int y, int x){
+
+    public void setBoxBlack(int y, int x) {
         this.buttons[y][x].setBackground(Color.BLACK);
     }
-    
+
+    public void setBoxWhite(int y, int x) {
+        this.buttons[y][x].setBackground(Color.WHITE);
+    }
+
+    public void setPause() {
+        this.pauseState = false;
+        this.stepButton.setVisible(true);
+        this.saveButton.setVisible(true);
+    }
+
+    public void random() {
+        this.game.randomise();
+    }
+
+    public void save(String string) {
+        try {
+            this.game.saveGameBoard(string);
+        } catch (Exception er) {
+
+        }
+    }
+
+    public Color getBoxColour(int y, int x) {
+        return this.buttons[y][x].getBackground();
+    }
+}
+
+class PauseButton extends JButton implements Runnable {
+    Game game;
+    TheoGUI theoGui;
+
+    public PauseButton(String text, Game game, TheoGUI theoGui) {
+        this.setText(text);
+        this.game = game;
+        this.theoGui = theoGui;
+    }
+
+    public void run() {
+        try {
+            this.game.gameLoop();
+        } catch (InterruptedException ee) {
+            System.out.println("Interrupted.");
+        } catch (Exception e) {
+        }
+    }
+}
+
+class SaveButton extends JButton implements Runnable {
+    Game game;
+    TheoGUI theoGui;
+
+    public SaveButton(String text, Game game, TheoGUI theoGui) {
+        this.setText(text);
+        this.game = game;
+        this.theoGui = theoGui;
+    }
+
+    public void run() {
+        try {
+            String value = this.theoGui.input.getText();
+            this.theoGui.save(value);
+        } catch (Exception e) {
+        }
+    }
 }
